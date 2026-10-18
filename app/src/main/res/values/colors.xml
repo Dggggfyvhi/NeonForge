@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="neon_primary">#00F0FF</color>
+    <color name="neon_accent">#FF00E5</color>
+    <color name="neon_bg">#05070D</color>
+    <color name="neon_text">#EAF6FF</color>
+</resources>
