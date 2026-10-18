@@ -1,65 +1,41 @@
 package com.neonforge.agent.net
 
 import android.content.Context
+import android.content.SharedPreferences
+import java.net.HttpURLConnection
+import java.net.URL
 
 object AgentClient {
-    const val AGNES_URL = "https://api.agnes-ai.cn/v1/chat/completions"
-    const val GLM_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-
-    fun setConfig(ctx: Context, key: String, value: String) {
-        ctx.getSharedPreferences("nf", Context.MODE_PRIVATE).edit().putString(key, value).apply()
+    fun agnesSync(ctx: Context, user: String, system: String): String {
+        val sp: SharedPreferences = ctx.getSharedPreferences("nf", Context.MODE_PRIVATE)
+        val key = sp.getString("agnes_key", "").orEmpty()
+        val model = sp.getString("agnes_model", "agnes-3.0-flash").orEmpty()
+        return httpPost("https://sapiens-ai.com/api/v1/chat/completions", key, model, user, system)
     }
 
-    fun getConfig(ctx: Context, key: String): String {
-        return ctx.getSharedPreferences("nf", Context.MODE_PRIVATE).getString(key, "") ?: ""
+    fun glmSync(ctx: Context, user: String, system: String): String {
+        val sp: SharedPreferences = ctx.getSharedPreferences("nf", Context.MODE_PRIVATE)
+        val key = sp.getString("glm_key", "").orEmpty()
+        val model = sp.getString("glm_model", "glm-4").orEmpty()
+        return httpPost("https://open.bigmodel.cn/api/paas/v4/chat/completions", key, model, user, system)
     }
 
-    private fun cfg(ctx: Context, key: String, def: String = "") = getConfig(ctx, key).ifEmpty { def }
-
-    fun agnesSync(ctx: Context, text: String): String {
+    private fun httpPost(url: String, key: String, model: String, user: String, system: String): String {
+        if (key.isEmpty()) return "no api key configured"
+        val payload = """{"model":"$model","messages":[{"role":"system","content":"$system"},{"role":"user","content":"$user"}]}"""
         return try {
-            val url = cfg(ctx, "agnes_url", AGNES_URL)
-            val key = cfg(ctx, "agnes_key")
-            val model = cfg(ctx, "agnes_model", "agnes-2.0-flash")
-            val body = """{"model":"$model","messages":[{"role":"user","content":"$text"}]}"""
-            java.net.URL(url).openConnection().apply {
-                (this as java.net.HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
-                    if (key.isNotEmpty()) setRequestProperty("Authorization", "Bearer $key")
-                    setRequestProperty("Accept", "text/event-stream")
-                    connectTimeout = 15000
-                    readTimeout = 60000
-                }.outputStream.use { it.write(body.toByteArray()) }
-                inputStream.bufferedReader().readText()
-            }
-        } catch (e: Exception) {
-            "Agnes 调用失败：${e.message}"
-        }
-    }
-
-    fun glmSync(ctx: Context, text: String): String {
-        return try {
-            val url = cfg(ctx, "glm_url", GLM_URL)
-            val key = cfg(ctx, "glm_key")
-            val model = cfg(ctx, "glm_model", "glm-4-flash")
-            val body = """{"model":"$model","messages":[{"role":"user","content":"$text"}]}"""
-            java.net.URL(url).openConnection().apply {
-                (this as java.net.HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
-                    if (key.isNotEmpty()) setRequestProperty("Authorization", "Bearer $key")
-                    connectTimeout = 15000
-                    readTimeout = 60000
-                }.outputStream.use { it.write(body.toByteArray()) }
-                val json = inputStream.bufferedReader().readText()
-                val m = Regex("\"content\"\\s*:\\s*\"([^\"]*)\"").find(json)
-                m?.groupValues?.get(1)?.replace("\\n", "\n") ?: json
-            }
-        } catch (e: Exception) {
-            "GLM 调用失败：${e.message}"
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Authorization", "Bearer $key")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.outputStream.write(payload.toByteArray())
+            val in = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+            val raw = in.bufferedReader().readText()
+            conn.disconnect()
+            raw
+        } catch (t: Throwable) {
+            "request failed: ${t.message}"
         }
     }
 }
