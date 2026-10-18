@@ -1,17 +1,9 @@
 #!/bin/sh
-#
-# Standard gradlew wrapper script adapted for minimal projects.
-#
+# Minimal POSIX wrapper for Gradle Wrapper
 set -e
-
-APP_NAME="Gradle"
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-CLASSPATH=.\gradle\wrapper\gradle-wrapper.jar
-
 if [ -n "$JAVA_HOME" ] ; then
     JAVACMD="$JAVA_HOME/bin/java"
 else
     JAVACMD="java"
 fi
-
-exec "$JAVACMD" $DEFAULT_JVM_OPTS -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+exec "$JAVACMD" -Xmx64m -Xms64m -classpath "./gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
